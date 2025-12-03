@@ -8,3 +8,4 @@ export async function getMarketData(query: string) {
 
   return res.json();
 }
+
