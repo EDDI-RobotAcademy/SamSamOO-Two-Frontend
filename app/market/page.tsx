@@ -20,21 +20,31 @@ export default function MarketPage() {
   };
 
   // ⭐ 개별 상품 리뷰 요청 (Next API 호출)
-  const fetchReviews = async (catalogId: string) => {
-    console.log("리뷰 요청 catalogId:", catalogId);
+const fetchReviews = async (catalogId: string) => {
+  console.log("리뷰 요청 catalogId:", catalogId);
 
-    const res = await fetch(`/market/reviews?catalogId=${catalogId}`);
+  const res = await fetch(`/market/reviews?catalogId=${catalogId}`);
+  if (!res.ok) {
+    console.error("리뷰 API 오류:", res.status);
+    return;
+  }
 
-    if (!res.ok) {
-      console.error("리뷰 API 오류:", res.status);
-      return;
-    }
+  const data = await res.json();
+  console.log("리뷰 API 결과:", data);
 
-    const data = await res.json();
-    console.log("리뷰 API 응답:", data);
+  // ⭐ reviews는 객체 → contents 배열만 꺼내기
+  const reviewArray = data.reviews?.contents || [];
 
-    setReviews(data.reviews || []);
-  };
+  // ⭐ 프론트 UI에 맞게 필드 표준화
+  const normalized = reviewArray.map((r: any) => ({
+    rating: r.reviewScore ?? 0,
+    content: r.reviewContent ?? ""
+  }));
+
+  setReviews(normalized);
+};
+
+
 
   return (
     <div className="p-6">
