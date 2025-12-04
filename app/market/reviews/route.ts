@@ -4,6 +4,8 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("catalogId");
+    const productName = searchParams.get("productName");
+    console.log("상품명:", productName);
 
     const response = await fetch(
       `http://localhost:33333/market-data/products/${id}/reviews`,

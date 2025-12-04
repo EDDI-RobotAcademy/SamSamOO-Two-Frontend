@@ -1,6 +1,8 @@
 "use client";
-
 import { useState } from "react";
+
+// ⭐ HTML 태그 제거 함수 추가
+const stripHtml = (html: string) => html.replace(/<[^>]*>?/gm, "");
 
 export default function MarketPage() {
   const [query, setQuery] = useState("");
@@ -19,31 +21,30 @@ export default function MarketPage() {
     setLoading(false);
   };
 
-  // ⭐ 개별 상품 리뷰 요청 (Next API 호출)
-const fetchReviews = async (catalogId: string) => {
-  console.log("리뷰 요청 catalogId:", catalogId);
+const fetchReviews = async (catalogId: string, productName: string) => {
+  const cleanName = stripHtml(productName);
 
-  const res = await fetch(`/market/reviews?catalogId=${catalogId}`);
+  const res = await fetch(
+    `/market/reviews?catalogId=${catalogId}?query=${encodeURIComponent(cleanName)}`
+  );
+
   if (!res.ok) {
     console.error("리뷰 API 오류:", res.status);
     return;
   }
 
   const data = await res.json();
-  console.log("리뷰 API 결과:", data);
 
-  // ⭐ reviews는 객체 → contents 배열만 꺼내기
   const reviewArray = data.reviews?.contents || [];
 
-  // ⭐ 프론트 UI에 맞게 필드 표준화
   const normalized = reviewArray.map((r: any) => ({
     rating: r.reviewScore ?? 0,
-    content: r.reviewContent ?? ""
+    content: r.reviewContent ?? "",
+    productName: cleanName,
   }));
 
   setReviews(normalized);
 };
-
 
 
   return (
@@ -86,7 +87,7 @@ const fetchReviews = async (catalogId: string) => {
             <p className="text-sm text-gray-500">{p.mall}</p>
 
             <button
-              onClick={() => fetchReviews(p.catalogId)}
+              onClick={() => fetchReviews(p.catalogId, p.name)}
               className="mt-2 w-full bg-green-600 text-white py-1 rounded"
             >
               리뷰 보기
