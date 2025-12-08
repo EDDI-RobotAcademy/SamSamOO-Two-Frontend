@@ -21,13 +21,15 @@ export default function Navbar() {
     return (
         <nav className="bg-gray-800 text-white p-4 flex justify-between">
             <div className="text-lg font-bold">
-                <Link href="/">MyApp</Link>
+                <Link href="/">상품 분석 시스템</Link>
             </div>
 
             <div className="flex items-center space-x-4">
-                <Link href="/">Home</Link>
-                <Link href="/market">Naver Store</Link>
-
+                <Link href="/" className="hover:text-gray-300">Home</Link>
+                <Link href="/market" className="hover:text-gray-300">Naver Store</Link>
+                <Link href="/product/list" className="hover:text-gray-300">상품 관리</Link>
+                <Link href="/product/register" className="hover:text-gray-300">상품 등록</Link>
+                
                 {isLoggedIn ? (
                     <div className="flex items-center space-x-3">
                         <div className="text-right">
