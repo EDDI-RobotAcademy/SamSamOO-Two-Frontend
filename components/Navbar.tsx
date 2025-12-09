@@ -5,12 +5,17 @@ import { useAuth } from "../contexts/AuthContext";
 import { useRouter } from "next/navigation";
 
 export default function Navbar() {
-    // const { isLoggedIn, logout } = useAuth();
+    const { isLoggedIn, user, logout, login } = useAuth();
     const router = useRouter();
 
     const handleLogout = () => {
-        // logout();
+        logout();
         router.push("/");
+    };
+
+    const handleLogin = () => {
+        window.location.href =
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}${process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH}`;
     };
 
     return (
@@ -19,32 +24,30 @@ export default function Navbar() {
                 <Link href="/">MyApp</Link>
             </div>
 
-            <div className="space-x-4">
+            <div className="flex items-center space-x-4">
                 <Link href="/">Home</Link>
-                {/* <Link href="/">분석</Link>
-                <Link href="/board/list">게시판</Link> */}
+                <Link href="/market">Naver Store</Link>
 
-                {/* {isLoggedIn ? (
-                    <button
-                        onClick={handleLogout}
-                        className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
-                    >
-                        Logout
-                    </button>
+                {isLoggedIn ? (
+                    <div className="flex items-center space-x-3">
+                        <div className="text-right">
+                            <div className="text-xs text-gray-300">{user?.email}</div>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
+                        >
+                            Logout
+                        </button>
+                    </div>
                 ) : (
-                    <Link
-                        href="/login"
+                    <button
+                        onClick={handleLogin}
                         className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-700"
                     >
                         Login
-                    </Link>
-                )} */}
-                <Link
-                        href="/login"
-                        className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-700"
-                    >
-                        Login
-                </Link>
+                    </button>
+                )}
             </div>
         </nav>
     );

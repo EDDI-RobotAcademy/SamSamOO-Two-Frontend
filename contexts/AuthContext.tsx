@@ -1,19 +1,75 @@
 "use client";
 
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-interface AuthContextType {}
+type User = {
+  email: string;
+  name: string;
+};
 
-const AuthContext = createContext<AuthContextType>({});
+type AuthContextType = {
+  isLoggedIn: boolean;
+  user: User | null;
+  login: () => void;
+  logout: () => void;
+};
+
+const AuthContext = createContext<AuthContextType>({
+  isLoggedIn: false,
+  user: null,
+  login: () => {},
+  logout: () => {},
+});
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    return (
-        <AuthContext.Provider value={{}}>
-            <div>
-            </div>
-            {children}
-        </AuthContext.Provider>
-    );
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  //서버에 로그인 상태 요청
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/authentication/status`, {
+      credentials: "include",
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.logged_in) {
+          setIsLoggedIn(true);
+          setUser({
+            email: data.email,
+            name: data.name
+          });
+        } else {
+          setIsLoggedIn(false);
+          setUser(null);
+        }
+      })
+      .catch(() => {
+        setIsLoggedIn(false);
+        setUser(null);
+      });
+  }, []);
+
+  //로그인: 구글 OAuth 이동
+  const login = () => {
+    window.location.href =
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}${process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH}`;
+  };
+
+  //로그아웃
+  const logout = async () => {
+    await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/authentication/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+    setIsLoggedIn(false);
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ isLoggedIn, user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => useContext(AuthContext);
