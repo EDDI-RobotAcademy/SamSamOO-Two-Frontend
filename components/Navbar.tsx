@@ -5,11 +5,19 @@ import { useAuth } from "../contexts/AuthContext";
 import { useRouter } from "next/navigation";
 
 export default function Navbar() {
+<<<<<<< Updated upstream
     const { isLoggedIn, user, logout, login } = useAuth();
     const router = useRouter();
 
     const handleLogout = () => {
         logout();
+=======
+    const { isLoggedIn, logout, user } = useAuth(); 
+    const router = useRouter();
+
+    const handleLogout = () => {
+        logout(); 
+>>>>>>> Stashed changes
         router.push("/");
     };
 
@@ -26,7 +34,7 @@ export default function Navbar() {
 
             <div className="flex items-center space-x-4">
                 <Link href="/" className="hover:text-gray-300">Home</Link>
-                <Link href="/market">DANAWA</Link>
+                <Link href="/market" className="hover:text-gray-300">DANAWA</Link>
                 <Link href="/product/list" className="hover:text-gray-300">상품 관리</Link>
                 <Link href="/product/register" className="hover:text-gray-300">상품 등록</Link>
                 
@@ -43,6 +51,7 @@ export default function Navbar() {
                         </button>
                     </div>
                 ) : (
+<<<<<<< Updated upstream
                     <button
                         onClick={handleLogout}
                         className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
@@ -56,6 +65,14 @@ export default function Navbar() {
                     >
                         Login
                     </button>
+=======
+                    <Link
+                        href="/login"
+                        className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-700"
+                    >
+                        Login
+                    </Link>
+>>>>>>> Stashed changes
                 )}
             </div>
         </nav>

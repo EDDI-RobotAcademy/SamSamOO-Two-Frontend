@@ -1,11 +1,16 @@
 "use client";
 
+<<<<<<< Updated upstream
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type User = {
   email: string;
   name: string;
 };
+=======
+import { createContext, useContext, ReactNode, useState, useEffect } from "react";
+interface AuthContextType {}
+>>>>>>> Stashed changes
 
 type AuthContextType = {
   isLoggedIn: boolean;
