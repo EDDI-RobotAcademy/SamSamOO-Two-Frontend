@@ -63,6 +63,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     setIsLoggedIn(false);
     setUser(null);
+    
+    // 로그아웃 이벤트 발생 (홈페이지가 감지할 수 있도록)
+    window.dispatchEvent(new Event('logout'));
+    
+    // localStorage를 이용한 다른 탭 동기화
+    localStorage.setItem('logout', Date.now().toString());
+    localStorage.removeItem('logout');
   };
 
   return (
