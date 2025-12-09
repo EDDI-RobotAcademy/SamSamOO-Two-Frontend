@@ -1,4 +1,6 @@
-"use client";
+/*"use client";
+
+import { useEffect, useState } from "react";
 
 export default function LoginPage() {
     const handleGoogleLogin = () => {
@@ -8,10 +10,11 @@ export default function LoginPage() {
     return (
         <div className="flex justify-center items-center h-screen">
             <button
+                onClick={handleGoogleLogin}
                 className="bg-red-600 text-white px-4 py-2 rounded"
             >
-                No set
+                Google Login
             </button>
         </div>
     );
-}
+}*/
