@@ -5,12 +5,17 @@ import { useAuth } from "../contexts/AuthContext";
 import { useRouter } from "next/navigation";
 
 export default function Navbar() {
-    // const { isLoggedIn, logout } = useAuth();
+    const { isLoggedIn, user, logout, login } = useAuth();
     const router = useRouter();
 
     const handleLogout = () => {
-        // logout();
+        logout();
         router.push("/");
+    };
+
+    const handleLogin = () => {
+        window.location.href =
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}${process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH}`;
     };
 
     return (
@@ -45,19 +50,13 @@ export default function Navbar() {
                         Logout
                     </button>
                 ) : (
-                    <Link
-                        href="/login"
+                    <button
+                        onClick={handleLogin}
                         className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-700"
                     >
                         Login
-                    </Link>
-                )} */}
-                <Link
-                        href="/login"
-                        className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-700"
-                    >
-                        Login
-                </Link>
+                    </button>
+                )}
             </div>
         </nav>
     );

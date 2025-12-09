@@ -1,28 +1,29 @@
-import { NextRequest } from "next/server";
-
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const query = searchParams.get("query"); // 반드시 query
-
-  if (!query) {
-    return Response.json({ error: "검색어(query)가 필요합니다." }, { status: 400 });
-  }
-
+export async function GET(req: Request) {
   try {
-    const res = await fetch(
-      `http://127.0.0.1:33333/market/search?q=${encodeURIComponent(query)}`
+    const { searchParams } = new URL(req.url);
+    const q = searchParams.get("q");
+
+    const response = await fetch(
+      `http://localhost:33333/market-data/search?query=${encodeURIComponent(q ?? "")}`,
+      { cache: "no-store" }
     );
 
-    if (!res.ok) {
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("❌ Backend Error Response:", text);
       return Response.json(
-        { error: "FastAPI 서버 오류", detail: await res.text() },
-        { status: res.status }
+        { error: "Backend error", detail: text },
+        { status: 500 }
       );
     }
 
-    const data = await res.json();
+    const data = await response.json();
     return Response.json(data);
+
   } catch (err: any) {
-    return Response.json({ error: err.message }, { status: 500 });
+    return Response.json(
+      { error: "Unexpected error", detail: err.message },
+      { status: 500 }
+    );
   }
 }
