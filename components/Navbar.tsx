@@ -26,7 +26,7 @@ export default function Navbar() {
 
             <div className="flex items-center space-x-4">
                 <Link href="/" className="hover:text-gray-300">Home</Link>
-                <Link href="/market" className="hover:text-gray-300">Naver Store</Link>
+                <Link href="/market">DANAWA</Link>
                 <Link href="/product/list" className="hover:text-gray-300">상품 관리</Link>
                 <Link href="/product/register" className="hover:text-gray-300">상품 등록</Link>
                 
