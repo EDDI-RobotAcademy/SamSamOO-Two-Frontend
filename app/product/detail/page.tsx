@@ -151,7 +151,7 @@ export default function ProductDetailPage() {
                 product.source
               )}`}
             >
-              {product.source.toUpperCase()}
+              {getPlatformDisplayName(product.source)}
             </span>
             <div className="flex gap-2">
               <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">

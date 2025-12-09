@@ -44,6 +44,7 @@ export default function ProductRegisterPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           ...formData,
           price: parseInt(formData.price),

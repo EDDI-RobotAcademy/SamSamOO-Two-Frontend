@@ -167,7 +167,7 @@ export default function ProductEditPage() {
             <span
               className={`px-4 py-2 rounded-full text-sm font-medium ${platformBadge}`}
             >
-              {String(source || "").toUpperCase()}
+              {getPlatformDisplayName(source || "")}
             </span>
 
             <div className="flex items-center gap-2 text-xs">
