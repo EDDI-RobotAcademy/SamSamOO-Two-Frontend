@@ -3,6 +3,7 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { getPlatformDisplayName, getPlatformBadgeColor } from '../../util/utils';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:33333";
@@ -36,8 +37,6 @@ export default function ProductEditPage() {
         return "bg-red-100 text-red-800";
       case "elevenst":
         return "bg-orange-100 text-orange-800";
-      case "gmarket":
-        return "bg-green-100 text-green-800";
       default:
         return "bg-gray-100 text-gray-800";
     }

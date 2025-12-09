@@ -149,7 +149,6 @@ export default function ProductRegisterPage() {
             >
               <option value="lotteon">롯데온 (Lotteon)</option>
               <option value="elevenst">11번가 (11st)</option>
-              <option value="gmarket">G마켓 (Gmarket)</option>
             </select>
           </div>
 

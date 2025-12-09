@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { getPlatformDisplayName, getPlatformBadgeColor } from '../../util/utils';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:33333";
 
@@ -127,18 +128,6 @@ export default function ProductDetailPage() {
     );
   }
 
-  const getPlatformBadgeColor = (source: string) => {
-    switch (source) {
-      case "lotteon":
-        return "bg-red-100 text-red-800";
-      case "elevenst":
-        return "bg-orange-100 text-orange-800";
-      case "gmarket":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
