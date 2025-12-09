@@ -16,15 +16,28 @@ export default function Navbar() {
     return (
         <nav className="bg-gray-800 text-white p-4 flex justify-between">
             <div className="text-lg font-bold">
-                <Link href="/">MyApp</Link>
+                <Link href="/">상품 분석 시스템</Link>
             </div>
 
-            <div className="space-x-4">
-                <Link href="/">Home</Link>
-                {/* <Link href="/">분석</Link>
-                <Link href="/board/list">게시판</Link> */}
-
-                {/* {isLoggedIn ? (
+            <div className="flex items-center space-x-4">
+                <Link href="/" className="hover:text-gray-300">Home</Link>
+                <Link href="/market">DANAWA</Link>
+                <Link href="/product/list" className="hover:text-gray-300">상품 관리</Link>
+                <Link href="/product/register" className="hover:text-gray-300">상품 등록</Link>
+                
+                {isLoggedIn ? (
+                    <div className="flex items-center space-x-3">
+                        <div className="text-right">
+                            <div className="text-xs text-gray-300">{user?.email}</div>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
+                        >
+                            Logout
+                        </button>
+                    </div>
+                ) : (
                     <button
                         onClick={handleLogout}
                         className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
