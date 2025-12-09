@@ -26,9 +26,7 @@ export default function Navbar() {
 
             <div className="flex items-center space-x-4">
                 <Link href="/">Home</Link>
-                <Link href="/market">DANAWA</Link>
-                {/* <Link href="/">분석</Link>
-                <Link href="/board/list">게시판</Link> */}
+                <Link href="/market">Naver Store</Link>
 
                 {isLoggedIn ? (
                     <div className="flex items-center space-x-3">
