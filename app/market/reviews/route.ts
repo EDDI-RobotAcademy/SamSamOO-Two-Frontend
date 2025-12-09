@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import puppeteer from "puppeteer";
+// import pool from "@/lib/db"; // ⭐ 주석 처리
 
-// ⭐ delay 헬퍼 함수 추가
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function GET(req: Request) {
   let browser;
+
   try {
     const { searchParams } = new URL(req.url);
     const productId = searchParams.get("productId");
@@ -13,7 +14,6 @@ export async function GET(req: Request) {
     console.log('🔍 리뷰 크롤링 시작 - productId:', productId);
 
     if (!productId) {
-      console.log('❌ productId 없음');
       return NextResponse.json({ reviews: [] });
     }
 
@@ -24,6 +24,10 @@ export async function GET(req: Request) {
 
     const page = await browser.newPage();
 
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    );
+
     console.log('🌐 페이지 이동 중...');
     await page.goto(
       `https://prod.danawa.com/info/?pcode=${productId}`,
@@ -32,8 +36,10 @@ export async function GET(req: Request) {
 
     console.log('⏳ 리뷰 섹션 대기 중...');
     await page.waitForSelector('.cmt_item', { timeout: 10000 });
+    await page.waitForSelector('.danawa-prodBlog-productOpinion-clazz-content', {
+      timeout: 5000
+    }).catch(() => console.log('⚠️ 일부 리뷰 내용 로딩 지연'));
 
-    // ✅ 수정: page.waitForTimeout → delay 함수 사용
     await delay(1000);
 
     console.log('📊 리뷰 데이터 추출 중...');
@@ -41,19 +47,15 @@ export async function GET(req: Request) {
       const items: any[] = [];
 
       document.querySelectorAll('li.cmt_item, li.cmt_reply').forEach(el => {
-        // 닉네임
         const nicknameEl = el.querySelector('.id_name strong');
         const nickname = nicknameEl?.textContent?.trim() || '';
 
-        // 날짜
         const dateEl = el.querySelector('.date');
         const date = dateEl?.textContent?.trim() || '';
 
-        // 삭제된 댓글 체크
         const delTextEl = el.querySelector('.txt_del');
         const delText = delTextEl?.textContent?.trim() || '';
 
-        // 일반 댓글 내용
         let content = '';
 
         if (delText) {
@@ -82,9 +84,6 @@ export async function GET(req: Request) {
     });
 
     console.log('✅ 크롤링 완료 - 리뷰 수:', reviews.length);
-    if (reviews.length > 0) {
-      console.log('📝 첫 번째 리뷰:', reviews[0]);
-    }
 
     return NextResponse.json({ reviews });
 
