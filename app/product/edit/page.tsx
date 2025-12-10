@@ -65,7 +65,7 @@ export default function ProductEditPage() {
       const data = await res.json();
       setForm({
         title: data.title ?? "",
-        source_url: data.source_url ?? "",
+        source_url: data.url ?? data.source_url ?? "", 
         price: data.price ?? "",
         category: data.category ?? "",
       });

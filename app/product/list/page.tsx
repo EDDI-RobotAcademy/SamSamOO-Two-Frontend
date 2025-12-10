@@ -11,7 +11,7 @@ interface Product {
   source: string;
   source_product_id: string;
   title: string;
-  url: string;
+  source_url: string;
   price: number;
   category: string;
   status: string;
@@ -149,7 +149,7 @@ export default function ProductListPage() {
                 {/* 버튼 그룹 */}
                 <div className="flex gap-2">
                   <a
-                    href={product.url}
+                    href={product.source_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-center rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-sm transition"

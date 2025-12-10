@@ -20,31 +20,52 @@ export default function Home() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+ useEffect(() => {
     checkAuthStatus();
   }, []);
 
   const checkAuthStatus = async () => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 7000); // 7초 타임아웃
+
     try {
-      const response = await fetch(`${API_BASE_URL}/authentication/status`, {
+      const res = await fetch(`${API_BASE_URL}/authentication/status`, {
         credentials: "include",
+        signal: ctrl.signal,
       });
-      const data = await response.json();
-      if (data.logged_in) {
+
+      if (!res.ok) throw new Error(`status ${res.status}`);
+
+      const data = await res.json();
+      if (data?.logged_in) {
         setIsLoggedIn(true);
-        fetchDashboardData();
+        await fetchDashboardData();
       } else {
         setIsLoggedIn(false);
-        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("인증 상태 확인 실패:", error);
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        // logout시 무시
+        return;
+      }
+
+      if (e?.message?.includes("Failed to fetch")) {
+        // 로그아웃 상태거나 서버가 응답 안하는 경우 — 정상상황으로 간주
+        console.debug("[Auth] No session or server unreachable. Treat as logged-out.");
+        setIsLoggedIn(false);
+        return;
+      }
+
+      // 그 외 진짜 오류만 표시
+      console.error("인증 상태 확인 실패:", e);
       setIsLoggedIn(false);
-      setIsLoading(false);
     } finally {
+      clearTimeout(t);
       setIsCheckingAuth(false);
+      setIsLoading(false);
     }
   };
+
 
   const handleLogin = () => {
     window.location.href = `${API_BASE_URL}${process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH}`;

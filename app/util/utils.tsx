@@ -129,3 +129,4 @@ export const formatNumber = (num: number): string => {
 export const formatPrice = (price: number): string => {
   return `${formatNumber(price)}원`;
 };
+
