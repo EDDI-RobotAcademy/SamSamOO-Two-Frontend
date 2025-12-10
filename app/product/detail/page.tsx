@@ -34,31 +34,40 @@ interface CollectionStatusResponse {
   total_reviews: number | null;
 }
 
-interface AnalysisRunResponse {
-  status: string;
-  message: string;
-  job_id: string | null;
-  data?: any;
+interface Review {
+  review_id: number;
+  reviewer: string;
+  rating: number;
+  content: string;
+  review_at: string;
 }
 
-interface AnalysisMetrics {
-  average_rating?: number;
-  sentiment_distribution?: {
-    positive: number;
+interface AnalysisResult {
+  job_id: string;
+  total_reviews: number;
+  sentiment_json: {
     neutral: number;
     negative: number;
+    positive: number;
   };
-  keyword_frequency?: Record<string, number>;
+  aspects_json: any;
+  keywords_json: string[];
+  issues_json: string[];
+  trend_json: any;
+  created_at: string;
 }
 
-interface AnalysisResultsResponse {
+interface InsightResult {
   job_id: string;
-  metrics: AnalysisMetrics;
-  summary: {
-    strengths?: string[];
-    weaknesses?: string[];
-    recommendations?: string[];
+  summary: string;
+  insights_json: {
+    quality_insights: string[];
+    service_insights: string[];
+    value_insights: string[];
   };
+  metadata_json: any;
+  evidence_ids: number[];
+  created_at: string;
 }
 
 export default function ProductDetailPage() {
@@ -75,9 +84,11 @@ export default function ProductDetailPage() {
   const [progress, setProgress] = useState<number>(0);
   const [statusMsg, setStatusMsg] = useState<string>("");
 
-  const [analysisState, setAnalysisState] = useState<"idle" | "running" | "done" | "error">("idle");
-  const [analysisJobId, setAnalysisJobId] = useState<string | null>(null);
-  const [analysisResults, setAnalysisResults] = useState<AnalysisResultsResponse | null>(null);
+  // ⭐️ 새로 추가: 리뷰 및 분석 결과
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [insightResult, setInsightResult] = useState<InsightResult | null>(null);
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -98,20 +109,17 @@ export default function ProductDetailPage() {
 
         const statusData = (await response.json()) as CollectionStatusResponse;
 
-        const newState = statusData.status;
-        const newProgress = statusData.progress;
-        const newMessage = statusData.error_message || "";
+        setCrawlState(statusData.status);
+        setProgress(statusData.progress);
+        setStatusMsg(statusData.error_message || "");
 
-        setCrawlState(newState);
-        setProgress(newProgress);
-        setStatusMsg(newMessage);
-
-        if (newState === "completed" || newState === "done" || newState === "failed") {
+        if (statusData.status === "completed" || statusData.status === "done" || statusData.status === "failed") {
           clearInterval(timer);
           pollTimerRef.current = null;
 
-          if (newState === "completed") {
+          if (statusData.status === "completed") {
             await fetchProductDetail();
+            await fetchReviewsAndAnalysis(); // ⭐️ 리뷰 및 분석 결과 로드
             
             window.alert(
               `크롤링 완료! 수집 리뷰: ${statusData.total_reviews ?? 0}건`
@@ -124,11 +132,12 @@ export default function ProductDetailPage() {
             if (shouldAnalyze) {
               await runAnalysis();
             }
-          } else if (newState === "done") {
+          } else if (statusData.status === "done") {
             await fetchProductDetail();
+            await fetchReviewsAndAnalysis(); // ⭐️ 리뷰 및 분석 결과 로드
             window.alert("리뷰 분석까지 모두 완료되었습니다!");
           } else {
-            window.alert(`크롤링 실패: ${newMessage || "알 수 없는 오류"}`);
+            window.alert(`크롤링 실패: ${statusData.error_message || "알 수 없는 오류"}`);
           }
         }
       } catch (err) {
@@ -181,7 +190,6 @@ export default function ProductDetailPage() {
     if (!product) return;
     
     try {
-      setAnalysisState("running");
       setCrawlState("analyzing");
       
       const response = await fetch(
@@ -191,105 +199,78 @@ export default function ProductDetailPage() {
 
       if (!response.ok) throw new Error("분석 시작에 실패했습니다.");
       
-      const data = (await response.json()) as AnalysisRunResponse;
+      const data = await response.json();
 
-      if (data.status === "success" && data.job_id) {
-        setAnalysisJobId(data.job_id);
-        setAnalysisState("done");
+      if (data.status === "success") {
         setCrawlState("done");
-        
-        await fetchAnalysisResults(data.job_id);
         await fetchProductDetail();
-        
+        await fetchReviewsAndAnalysis(); // ⭐️ 분석 결과 로드
         window.alert("리뷰 분석이 완료되었습니다!");
-      } else if (data.message === "No reviews found.") {
-        setAnalysisState("idle");
-        setCrawlState("completed");
-        window.alert("분석할 리뷰가 없습니다.");
       } else {
         throw new Error(data.message || "분석 실패");
       }
     } catch (err: any) {
-      setAnalysisState("error");
       setCrawlState("failed");
       console.error("Analysis error:", err);
       window.alert(err.message || "분석 중 오류가 발생했습니다.");
     }
   };
 
-  // 분석 결과 조회
-  const fetchAnalysisResults = async (jobId: string) => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/analysis/job/${jobId}/results`
-      );
+  // ⭐️ 리뷰 및 분석 결과 가져오기
+  const fetchReviewsAndAnalysis = async () => {
+    if (!source || !id) return;
 
-      if (!response.ok) throw new Error("분석 결과 조회 실패");
-      
-      const data = (await response.json()) as AnalysisResultsResponse;
-      setAnalysisResults(data);
+    try {
+      // 1. 리뷰 가져오기
+      const reviewsRes = await fetch(
+        `${API_BASE_URL}/review/list?source=${source}&source_product_id=${id}&limit=10`
+      );
+      if (reviewsRes.ok) {
+        const reviewsData = await reviewsRes.json();
+        setReviews(reviewsData.reviews || []);
+      }
+
+      // 2. 분석 결과 가져오기
+      const analysisRes = await fetch(
+        `${API_BASE_URL}/analysis/${source}/${id}/latest`
+      );
+      if (analysisRes.ok) {
+        const analysisData = await analysisRes.json();
+        setAnalysisResult(analysisData.analysis_result || null);
+        setInsightResult(analysisData.insight_result || null);
+      }
     } catch (err) {
-      console.error("Failed to fetch analysis results:", err);
+      console.error("데이터 로드 실패:", err);
     }
   };
-
-  // 제품 상세 조회 + 상태 복원
-  useEffect(() => {
-    if (source && id) {
-      fetchProductDetail();
-      checkCurrentStatus(id);
-    }
-
-    return () => {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
-        pollTimerRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, id]);
 
   // 현재 상태 확인
   const checkCurrentStatus = async (productId: string) => {
     try {
-          console.log("🔍 상태 조회 시도:", productId);
-
       const response = await fetch(
         `${API_BASE_URL}/review/collect/status/${productId}`
       );
-          console.log("📬 응답 상태:", response.status);
 
-       // 404는 정상 (아직 크롤링한 적 없음)
-    if (response.status === 404) {
-      console.log("✅ 크롤링 이력 없음 (idle 상태)");
-      setCrawlState("idle");
-      return;
-    }
-    
-    if (!response.ok) {
-      console.warn("⚠️ 상태 조회 실패:", response.status);
-      return;
-    }
-    
-    const statusData = (await response.json()) as CollectionStatusResponse;
-    console.log("✅ 크롤링 상태:", statusData);
-    
-    setCrawlState(statusData.status);
-    setProgress(statusData.progress);
-    setStatusMsg(statusData.error_message || "");
+      if (response.status === 404) {
+        setCrawlState("idle");
+        return;
+      }
+      
+      if (!response.ok) return;
+      
+      const statusData = (await response.json()) as CollectionStatusResponse;
+      
+      setCrawlState(statusData.status);
+      setProgress(statusData.progress);
+      setStatusMsg(statusData.error_message || "");
 
-    // 진행중인 작업이 있으면 폴링 시작
-    if (statusData.status === "collecting" || statusData.status === "analyzing") {
-      console.log("🔄 진행중인 작업 발견! 폴링 시작");
-      startPolling(productId);
+      if (statusData.status === "collecting" || statusData.status === "analyzing") {
+        startPolling(productId);
+      }
+    } catch (err: any) {
+      console.error("❌ 네트워크 에러:", err.message);
     }
-  } catch (err: any) {
-    // fetch 자체가 실패한 경우 (네트워크 에러, CORS 등)
-    console.error("❌ 네트워크 에러:", err.message);
-    // ⭐️ 사용자에게는 보여주지 않음 (선택사항)
-    // alert("상태 조회 중 네트워크 오류가 발생했습니다.");
-  }
-};
+  };
 
   const fetchProductDetail = async () => {
     try {
@@ -342,25 +323,41 @@ export default function ProductDetailPage() {
     }
   };
 
-  // beforeunload 경고
-  const beforeUnloadGuard = (e: BeforeUnloadEvent) => {
-    if (crawlState === "collecting" || crawlState === "analyzing") {
-      e.preventDefault();
-      e.returnValue = "";
-    }
-  };
-
+  // 초기 로드
   useEffect(() => {
+    if (source && id) {
+      fetchProductDetail();
+      checkCurrentStatus(id);
+      fetchReviewsAndAnalysis(); // ⭐️ 기존 데이터 로드
+    }
+
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source, id]);
+
+  // beforeunload 경고
+  useEffect(() => {
+    const beforeUnloadGuard = (e: BeforeUnloadEvent) => {
+      if (crawlState === "collecting" || crawlState === "analyzing") {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
     if (crawlState === "collecting" || crawlState === "analyzing") {
       window.addEventListener("beforeunload", beforeUnloadGuard);
     } else {
       window.removeEventListener("beforeunload", beforeUnloadGuard);
     }
     return () => window.removeEventListener("beforeunload", beforeUnloadGuard);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crawlState]);
 
-  // ⭐️ 로딩 화면
+  // 로딩 화면
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -372,7 +369,7 @@ export default function ProductDetailPage() {
     );
   }
 
-  // ⭐️ 에러 화면
+  // 에러 화면
   if (error || !product) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
@@ -383,7 +380,7 @@ export default function ProductDetailPage() {
           </div>
           <Link 
             href="/product/list" 
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -395,7 +392,8 @@ export default function ProductDetailPage() {
     );
   }
 
-  // ⭐️ 본문 (여기부터는 이전에 제공한 코드)
+  const displayedReviews = showAllReviews ? reviews : reviews.slice(0, 5);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
       <div className="max-w-6xl mx-auto">
@@ -404,7 +402,7 @@ export default function ProductDetailPage() {
         <div className="mb-6">
           <Link
             href="/product/list"
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition"
+            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -421,26 +419,22 @@ export default function ProductDetailPage() {
             
             {/* 상품 기본 정보 카드 */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-              
-              {/* 배지 */}
               <div className="flex flex-wrap items-center gap-3 mb-4">
                 <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getPlatformBadgeColor(product.source)}`}>
                   {getPlatformDisplayName(product.source)}
                 </span>
-                <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-full">
+                <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
                   {product.category}
                 </span>
-                <span className="px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-medium rounded-full">
+                <span className="px-3 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-full">
                   {product.status}
                 </span>
               </div>
 
-              {/* 제목 */}
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-4 leading-tight">
                 {product.title}
               </h1>
 
-              {/* 가격 */}
               <div className="mb-6">
                 <p className="text-4xl md:text-5xl font-bold text-blue-600 dark:text-blue-400">
                   {product.price?.toLocaleString()}
@@ -448,47 +442,33 @@ export default function ProductDetailPage() {
                 </p>
               </div>
 
-              {/* 정보 그리드 */}
               <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                 <div className="space-y-1">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">상품 ID</p>
+                  <p className="text-xs text-gray-500">상품 ID</p>
                   <p className="font-mono text-sm font-medium text-gray-900 dark:text-white break-all">
                     {product.source_product_id}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">등록일</p>
+                  <p className="text-xs text-gray-500">등록일</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {new Date(product.collected_at).toLocaleDateString("ko-KR")}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">리뷰 수</p>
+                  <p className="text-xs text-gray-500">리뷰 수</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {product.review_count?.toLocaleString() || 0}개
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">평균 평점</p>
+                  <p className="text-xs text-gray-500">평균 평점</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {product.rating ? `⭐ ${product.rating.toFixed(1)} / 5.0` : "N/A"}
                   </p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">분석 상태</p>
-                  <p className="text-sm font-medium">{product.analysis_status}</p>
-                </div>
-                {product.seller && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">판매자</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {product.seller}
-                    </p>
-                  </div>
-                )}
               </div>
 
-              {/* 원본 링크 */}
               <div className="mt-4">
                 <a
                   href={product.source_url}
@@ -525,32 +505,159 @@ export default function ProductDetailPage() {
                   </div>
                   
                   {statusMsg && <p className="text-sm text-gray-600">{statusMsg}</p>}
-                  
-                  <div className="mt-4 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      💡 페이지를 벗어나도 작업은 계속 진행됩니다.
-                    </p>
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* 분석 결과는 생략 (필요시 이전 코드 참고) */}
-
-            {/* 리뷰 목록 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-              <h2 className="text-2xl font-bold mb-4">💬 리뷰 목록</h2>
-
-              {product.review_count > 0 ? (
-                <div>
-                  <p className="mb-4">수집된 리뷰: {product.review_count.toLocaleString()}개</p>
-                  <Link
-                    href={`/review/list?source=${product.source}&product_id=${product.source_product_id}`}
-                    className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-block"
-                  >
-                    리뷰 목록 보기 →
-                  </Link>
+            {/* ⭐️ 분석 결과 */}
+            {analysisResult && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                <h2 className="text-2xl font-bold mb-4">📊 분석 결과</h2>
+                
+                {/* 감정 분포 */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-3">감정 분석</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-green-50 p-4 rounded-lg text-center">
+                      <p className="text-sm text-gray-600 mb-1">긍정</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {analysisResult.sentiment_json?.positive || 0}%
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg text-center">
+                      <p className="text-sm text-gray-600 mb-1">중립</p>
+                      <p className="text-2xl font-bold text-gray-600">
+                        {analysisResult.sentiment_json?.neutral || 0}%
+                      </p>
+                    </div>
+                    <div className="bg-red-50 p-4 rounded-lg text-center">
+                      <p className="text-sm text-gray-600 mb-1">부정</p>
+                      <p className="text-2xl font-bold text-red-600">
+                        {analysisResult.sentiment_json?.negative || 0}%
+                      </p>
+                    </div>
+                  </div>
                 </div>
+
+                {/* 주요 키워드 */}
+                {analysisResult.keywords_json && analysisResult.keywords_json.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-3">주요 키워드</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {analysisResult.keywords_json.slice(0, 10).map((keyword, idx) => (
+                        <span 
+                          key={idx}
+                          className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                        >
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 주요 이슈 */}
+                {analysisResult.issues_json && analysisResult.issues_json.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">주요 이슈</h3>
+                    <ul className="space-y-2">
+                      {analysisResult.issues_json.slice(0, 5).map((issue, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-red-500 mt-1">⚠️</span>
+                          <span className="text-sm text-gray-700">{issue}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ⭐️ AI 인사이트 */}
+            {insightResult && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                <h2 className="text-2xl font-bold mb-4">🤖 AI 인사이트</h2>
+                
+                <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                  <p className="text-gray-700">{insightResult.summary}</p>
+                </div>
+
+                {insightResult.insights_json && (
+                  <div className="space-y-4">
+                    {Array.isArray(insightResult.insights_json.quality_insights) && 
+                     insightResult.insights_json.quality_insights.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold text-green-600 mb-2">💚 품질 관련</h3>
+                        <ul className="space-y-1">
+                          {insightResult.insights_json.quality_insights.map((insight, idx) => (
+                            <li key={idx} className="text-sm text-gray-700 pl-4">• {insight}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {Array.isArray(insightResult.insights_json.service_insights) && 
+                     insightResult.insights_json.service_insights.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold text-blue-600 mb-2">💙 서비스 관련</h3>
+                        <ul className="space-y-1">
+                          {insightResult.insights_json.service_insights.map((insight, idx) => (
+                            <li key={idx} className="text-sm text-gray-700 pl-4">• {insight}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {Array.isArray(insightResult.insights_json.value_insights) && 
+                     insightResult.insights_json.value_insights.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold text-purple-600 mb-2">💜 가치 관련</h3>
+                        <ul className="space-y-1">
+                          {insightResult.insights_json.value_insights.map((insight, idx) => (
+                            <li key={idx} className="text-sm text-gray-700 pl-4">• {insight}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ⭐️ 리뷰 목록 */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+              <h2 className="text-2xl font-bold mb-4">💬 수집된 리뷰</h2>
+
+              {reviews.length > 0 ? (
+                <div>
+                  <p className="mb-4 text-gray-600">총 {reviews.length}개의 리뷰</p>
+                  
+                  <div className="space-y-4">
+                    {displayedReviews.map((review, index) => (
+                      <div key={`review-${index}`} className="border-b pb-4 last:border-b-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-900">{review.reviewer}</span>
+                            <span className="text-yellow-500">{"⭐".repeat(review.rating)}</span>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {new Date(review.review_at).toLocaleDateString("ko-KR")}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-700 line-clamp-3">{review.content}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {reviews.length > 5 && (
+                    <button
+                      onClick={() => setShowAllReviews(!showAllReviews)}
+                      className="mt-4 w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium"
+                    >
+                      {showAllReviews ? "접기" : `더보기 (${reviews.length - 5}개 더 있음)`}
+                    </button>
+                  )}
+                </div>  
               ) : (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">📭</div>
