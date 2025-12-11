@@ -20,13 +20,13 @@ export default function Home() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
- useEffect(() => {
+  useEffect(() => {
     checkAuthStatus();
   }, []);
 
   const checkAuthStatus = async () => {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 7000); // 7초 타임아웃
+    const t = setTimeout(() => ctrl.abort(), 7000);
 
     try {
       const res = await fetch(`${API_BASE_URL}/authentication/status`, {
@@ -45,18 +45,15 @@ export default function Home() {
       }
     } catch (e: any) {
       if (e?.name === "AbortError") {
-        // logout시 무시
         return;
       }
 
       if (e?.message?.includes("Failed to fetch")) {
-        // 로그아웃 상태거나 서버가 응답 안하는 경우 — 정상상황으로 간주
         console.debug("[Auth] No session or server unreachable. Treat as logged-out.");
         setIsLoggedIn(false);
         return;
       }
 
-      // 그 외 진짜 오류만 표시
       console.error("인증 상태 확인 실패:", e);
       setIsLoggedIn(false);
     } finally {
@@ -66,15 +63,13 @@ export default function Home() {
     }
   };
 
-
   const handleLogin = () => {
     window.location.href = `${API_BASE_URL}${process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH}`;
   };
 
-  // 로그아웃 이벤트 감지
+  // ===== ✅ 중복 제거: 로그아웃 이벤트 감지 (통합) =====
   useEffect(() => {
     const handleLogoutEvent = () => {
-      // 로그아웃 시 상태 초기화 및 비로그인 화면으로 전환
       setIsLoggedIn(false);
       setIsCheckingAuth(false);
       setIsLoading(false);
@@ -95,31 +90,8 @@ export default function Home() {
     };
   }, []);
 
-  // 로그아웃 이벤트 감지 (다른 컴포넌트에서 로그아웃 시)
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'logout') {
-        checkAuthStatus();
-      }
-    };
-
-    // 커스텀 이벤트 리스너 (같은 탭에서의 로그아웃 감지)
-    const handleLogoutEvent = () => {
-      checkAuthStatus();
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('logout', handleLogoutEvent);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('logout', handleLogoutEvent);
-    };
-  }, []);
-
   const fetchDashboardData = async () => {
     try {
-      // 백엔드 대시보드 API 호출
       const response = await fetch(`${API_BASE_URL}/dashboard/statistics`, {
         credentials: "include",
       });
@@ -130,7 +102,6 @@ export default function Home() {
       
       const data = await response.json();
       
-      // API 응답 구조에 맞게 state 업데이트
       setStats({
         totalProducts: data.total_products || 0,
         platformDistribution: data.platform_distribution || {},
@@ -138,7 +109,6 @@ export default function Home() {
       });
     } catch (error) {
       console.error("데이터 로드 실패:", error);
-      // 에러 시 빈 데이터로 초기화
       setStats({
         totalProducts: 0,
         platformDistribution: {},
