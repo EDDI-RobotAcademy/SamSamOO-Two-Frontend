@@ -9,6 +9,7 @@ export default function ProductActionPanel({
   onStartCrawl,
   onStartAnalyze,
   onDelete,
+  onRecollect,
   pendingFlags,
 }: {
   product: Product;
@@ -16,14 +17,32 @@ export default function ProductActionPanel({
   onStartCrawl: () => void;
   onStartAnalyze: () => void;
   onDelete: () => void;
-  pendingFlags: { crawl: boolean; analyze: boolean };
+  onRecollect?: () => void; 
+  pendingFlags: { crawl: boolean; analyze: boolean; recollect?: boolean };
 }) {
   const busy = isBusy(product.analysis_status);
+  const canRecollect = product.analysis_status === 'ANALYZED'; // ✅ 분석 완료여야 활성
 
   return (
     <div className="sticky top-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
       <h3 className="text-lg font-semibold mb-4">작업 관리</h3>
       <div className="space-y-3">
+        {onRecollect && (
+                <>
+                <button
+                    className="w-full bg-blue-600 text-white rounded-md py-2 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                    onClick={() => onRecollect()}
+                    disabled={!canRecollect || pendingFlags.recollect || busy} // ✅ 조건
+                    title={canRecollect ? '리뷰를 다시 수집합니다' : '분석 완료 상태에서만 사용할 수 있습니다'}
+                >
+                    {pendingFlags.recollect ? '재수집 중...' : '리뷰 재수집'}
+                </button>
+
+                {!canRecollect && (
+                    <p className="text-xs text-gray-500">※ 분석이 완료되면 재수집이 가능해요.</p>
+                )}
+                </>
+            )}
         {product.analysis_status === 'PENDING' && (
           <button onClick={onStartCrawl} disabled={busy || pendingFlags.crawl}
             className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">

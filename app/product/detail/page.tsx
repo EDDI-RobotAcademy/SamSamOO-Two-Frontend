@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { isBusy } from '../../../lib/status';
 import type { AnalysisResult, InsightResult, Product, Review } from '../../../lib/types';
-import { fetchProduct, fetchReviews, fetchLatestAnalysis, startCrawl, startAnalyze, deleteProduct } from '../../../lib/api';
+import { fetchProduct, fetchReviews, fetchLatestAnalysis, startCrawl, startAnalyze, deleteProduct, recollectReviews } from '../../../lib/api';
 
 import ProductHeader from '@/components/product/ProductHeader';
 import ProductStatusBanner from '@/components/product/ProductStatusBanner';
@@ -31,7 +31,7 @@ export default function ProductDetailPage() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [insight, setInsight] = useState<InsightResult | null>(null);
 
-  const [pending, setPending] = useState({ crawl: false, analyze: false });
+  const [pending, setPending] = useState({ crawl: false, analyze: false, recollect: false });
 
   // 제품 정보
   const loadProduct = async () => {
@@ -115,6 +115,63 @@ export default function ProductDetailPage() {
     }
   };
 
+  // ✅ 재수집 핸들러 (폴링 추가)
+  const onRecollect = async () => {
+    if (!product) return;
+    
+    if (!confirm('기존 리뷰와 분석 결과가 모두 삭제됩니다. 재수집하시겠습니까?')) {
+      return;
+    }
+    
+    try {
+      setPending((p) => ({ ...p, recollect: true }));
+      
+      const res = await recollectReviews(product.source, product.source_product_id);
+      
+      alert(res?.message || `재수집 시작${res?.task_id ? ` (Task: ${res.task_id})` : ''}`);
+      
+      // 즉시 상품 정보 새로고침
+      await loadProduct();
+      
+      // 폴링 시작 (5초마다 상태 확인)
+      const pollInterval = setInterval(async () => {
+        const updatedProduct = await fetchProduct(product.source, product.source_product_id);
+        setProduct(updatedProduct);
+        
+        console.log(`[POLLING] 상태: ${updatedProduct.analysis_status}`);
+        
+        // 완료되면 폴링 중단
+        if (updatedProduct.analysis_status === 'ANALYZED' || updatedProduct.analysis_status === 'FAILED') {
+          clearInterval(pollInterval);
+          console.log('[POLLING] 완료 - 폴링 중단');
+          
+          // 리뷰와 분석 결과 새로고침
+          await loadReviews();
+          await loadAnalysis();
+          
+          setPending((p) => ({ ...p, recollect: false }));
+          
+          if (updatedProduct.analysis_status === 'ANALYZED') {
+            alert('재수집 및 분석이 완료되었습니다! 🎉');
+          } else {
+            alert('재수집 중 오류가 발생했습니다. ❌');
+          }
+        }
+      }, 5000);
+      
+      // 5분 후 자동 중단
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setPending((p) => ({ ...p, recollect: false }));
+        console.log('[POLLING] 타임아웃 - 폴링 중단');
+      }, 300000);
+      
+    } catch (e: any) {
+      alert(e?.message || '재수집 요청 실패');
+      setPending((p) => ({ ...p, recollect: false }));
+    }
+  };
+
   // 초기 로딩
   useEffect(() => {
     if (source && id) loadProduct();
@@ -181,7 +238,7 @@ export default function ProductDetailPage() {
               status={product.analysis_status}
               onStartCrawl={onStartCrawl}
               onStartAnalyze={onStartAnalyze}
-              busy={busy || pending.crawl || pending.analyze}
+              busy={busy || pending.crawl || pending.analyze || pending.recollect}
             />
 
             {analysis && product.analysis_status === 'ANALYZED' && <ProductAnalysis result={analysis} />}
@@ -202,6 +259,7 @@ export default function ProductDetailPage() {
               onStartCrawl={onStartCrawl}
               onStartAnalyze={onStartAnalyze}
               onDelete={onDelete}
+              onRecollect={onRecollect}
               pendingFlags={pending}
             />
           </div>

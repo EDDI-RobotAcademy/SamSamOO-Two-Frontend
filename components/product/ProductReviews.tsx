@@ -1,5 +1,5 @@
 'use client';
-import type { Review } from '../../lib/types';
+import type { Review } from '@/lib/types';
 
 export default function ProductReviews({
   reviews, loading, error, onRefresh,

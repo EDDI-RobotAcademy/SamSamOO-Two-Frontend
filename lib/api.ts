@@ -49,3 +49,37 @@ export async function deleteProduct(source: string, id: string) {
   const r = await fetch(`${API_BASE_URL}/product/delete?source=${source}&source_product_id=${id}`, { method: 'DELETE' });
   if (!r.ok) throw new Error('삭제 실패');
 }
+
+
+export async function recollectReviews(source: string, id: string) {
+  const res = await fetch(
+    `${API_BASE_URL}/review/recollect?source=${source}&source_product_id=${id}`,
+    {
+      method: 'POST',
+      credentials: 'include',
+    }
+  );
+  
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.detail || '재수집 요청 실패');
+  }
+  
+  return res.json();
+}
+
+// lib/api.ts
+export async function reanalyzeProduct(source: string, id: string) {
+  const res = await fetch(
+    `${API_BASE_URL}/review/recollect?source=${source}&source_product_id=${id}`,
+    {
+      method: 'POST',
+      credentials: 'include',
+    }
+  );
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || '재수집 시작 실패');
+  }
+  return res.json();
+}
