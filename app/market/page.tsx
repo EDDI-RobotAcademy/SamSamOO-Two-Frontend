@@ -1,10 +1,18 @@
 "use client";
 import { useState } from "react";
 import ReactMarkdown from 'react-markdown';
+import jsPDF from 'jspdf';
 
+// ⭐ dynamic import로 변경
+let html2canvas: any = null;
+if (typeof window !== 'undefined') {
+  import('html2canvas').then(module => {
+    html2canvas = module.default;
+  });
+}
 const stripHtml = (html: string) => html.replace(/<[^>]*>?/gm, "");
 
-export default function MarketPage() {  // ⭐ 이 부분 확인!
+export default function MarketPage() {
   const [query, setQuery] = useState("");
   const [products, setProducts] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
@@ -99,6 +107,197 @@ export default function MarketPage() {  // ⭐ 이 부분 확인!
     }
   };
 
+  // CSV 다운로드
+  const downloadCSV = () => {
+    if (reviews.length === 0) {
+      alert('다운로드할 리뷰가 없습니다.');
+      return;
+    }
+
+    let csv = '\uFEFF'; // UTF-8 BOM
+    csv += '상품명,작성자,날짜,리뷰내용\n';
+
+    reviews.forEach(review => {
+      const row = [
+        selectedProduct,
+        review.nickname,
+        review.date,
+        `"${review.content.replace(/"/g, '""')}"`
+      ].join(',');
+      csv += row + '\n';
+    });
+
+    if (statistics) {
+      csv += '\n통계 정보\n';
+      csv += `총 리뷰 수,${statistics.totalReviews}\n`;
+      csv += `전체 감성,${statistics.sentiment}\n`;
+      csv += '\n주요 키워드\n';
+      csv += '키워드,빈도\n';
+      statistics.topKeywords.forEach((kw: any) => {
+        csv += `${kw.keyword},${kw.count}\n`;
+      });
+    }
+
+    if (analysis) {
+      csv += '\nAI 분석 결과\n';
+      csv += `"${analysis.replace(/"/g, '""')}"\n`;
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${selectedProduct}_리뷰분석_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // PDF 다운로드
+ const downloadPDF = async () => {
+    if (reviews.length === 0) {
+      alert('다운로드할 리뷰가 없습니다.');
+      return;
+    }
+
+    try {
+      // PDF용 HTML 생성
+      const printContent = document.createElement('div');
+      printContent.style.width = '800px';
+      printContent.style.padding = '40px';
+      printContent.style.backgroundColor = 'white';
+      printContent.style.fontFamily = 'Arial, sans-serif';
+
+      // 제목
+      printContent.innerHTML = `
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="font-size: 24px; margin-bottom: 10px;">${selectedProduct}</h1>
+          <h2 style="font-size: 18px; color: #666; margin-bottom: 5px;">리뷰 분석 보고서</h2>
+          <p style="font-size: 12px; color: #999;">생성일: ${new Date().toLocaleDateString('ko-KR')}</p>
+        </div>
+      `;
+
+      // 통계 정보
+      if (statistics) {
+        printContent.innerHTML += `
+          <div style="margin-bottom: 30px;">
+            <h3 style="font-size: 18px; margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 5px;">📊 통계 정보</h3>
+            <p style="font-size: 14px; margin: 8px 0;"><strong>총 리뷰 수:</strong> ${statistics.totalReviews}개</p>
+            <p style="font-size: 14px; margin: 8px 0;"><strong>전체 감성:</strong> ${statistics.sentiment}</p>
+            <div style="margin-top: 15px;">
+              <p style="font-size: 14px; font-weight: bold; margin-bottom: 10px;">주요 키워드:</p>
+              <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                <thead>
+                  <tr style="background-color: #4285f4; color: white;">
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">순위</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">키워드</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">빈도</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${statistics.topKeywords.slice(0, 10).map((kw: any, idx: number) => `
+                    <tr style="${idx % 2 === 0 ? 'background-color: #f9f9f9;' : ''}">
+                      <td style="border: 1px solid #ddd; padding: 8px;">${idx + 1}</td>
+                      <td style="border: 1px solid #ddd; padding: 8px;">${kw.keyword}</td>
+                      <td style="border: 1px solid #ddd; padding: 8px;">${kw.count}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      // AI 분석 결과
+      if (analysis) {
+        const formattedAnalysis = analysis
+          .replace(/#{1,6}\s/g, '')
+          .replace(/\*\*/g, '<strong>')
+          .replace(/\n\n/g, '</p><p style="margin: 8px 0;">')
+          .replace(/\n/g, '<br/>');
+
+        printContent.innerHTML += `
+          <div style="margin-bottom: 30px; page-break-inside: avoid;">
+            <h3 style="font-size: 18px; margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 5px;">🤖 AI 분석 결과</h3>
+            <div style="font-size: 12px; line-height: 1.6;">
+              <p style="margin: 8px 0;">${formattedAnalysis}</p>
+            </div>
+          </div>
+        `;
+      }
+
+      // 리뷰 목록
+      printContent.innerHTML += `
+        <div style="page-break-before: always;">
+          <h3 style="font-size: 18px; margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 5px;">📝 리뷰 목록</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+            <thead>
+              <tr style="background-color: #4285f4; color: white;">
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; width: 40px;">No</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; width: 100px;">작성자</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; width: 100px;">날짜</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">리뷰 내용</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${reviews.slice(0, 50).map((review, idx) => `
+                <tr style="${idx % 2 === 0 ? 'background-color: #f9f9f9;' : ''}">
+                  <td style="border: 1px solid #ddd; padding: 6px;">${idx + 1}</td>
+                  <td style="border: 1px solid #ddd; padding: 6px;">${review.nickname}</td>
+                  <td style="border: 1px solid #ddd; padding: 6px;">${review.date}</td>
+                  <td style="border: 1px solid #ddd; padding: 6px;">${review.content.substring(0, 200)}${review.content.length > 200 ? '...' : ''}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          ${reviews.length > 50 ? `<p style="text-align: center; margin-top: 10px; font-style: italic; color: #666;">... 외 ${reviews.length - 50}개의 리뷰</p>` : ''}
+        </div>
+      `;
+
+      // 임시로 body에 추가
+      printContent.style.position = 'absolute';
+      printContent.style.left = '-9999px';
+      document.body.appendChild(printContent);
+
+      // HTML을 캔버스로 변환
+      const canvas = await html2canvas(printContent, {
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+
+      // 캔버스를 PDF로 변환
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210; // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= 297; // A4 height in mm
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= 297;
+      }
+
+      // 임시 요소 제거
+      document.body.removeChild(printContent);
+
+      // PDF 저장
+      pdf.save(`${selectedProduct}_리뷰분석_${new Date().toISOString().split('T')[0]}.pdf`);
+
+    } catch (error) {
+      console.error('PDF 생성 오류:', error);
+      alert('PDF 생성 중 오류가 발생했습니다.');
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">🛍️ 다나와 상품 분석</h1>
@@ -120,6 +319,24 @@ export default function MarketPage() {  // ⭐ 이 부분 확인!
           {loading ? '검색 중...' : '검색'}
         </button>
       </div>
+
+      {/* 다운로드 버튼 - 리뷰와 분석이 모두 있을 때만 표시 */}
+      {(reviews.length > 0 && analysis) && (
+        <div className="mb-6 flex gap-3 justify-end">
+          <button
+            onClick={downloadCSV}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
+          >
+            📊 CSV 다운로드
+          </button>
+          <button
+            onClick={downloadPDF}
+            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2"
+          >
+            📄 PDF 다운로드
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 왼쪽: 상품 목록 */}
@@ -242,4 +459,4 @@ export default function MarketPage() {  // ⭐ 이 부분 확인!
       </div>
     </div>
   );
-}  // ⭐ 여기가 정상적으로 닫혀있는지 확인!
+}

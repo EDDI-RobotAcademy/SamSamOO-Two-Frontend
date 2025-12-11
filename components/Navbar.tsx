@@ -29,13 +29,13 @@ export default function Navbar() {
         {/* 항상 노출 */}
         <Link href="/" className="hover:text-gray-300">Home</Link>
         {/* 로그인된 경우에만 노출 */}
-        {isLoggedIn && (
+
           <>
             <Link href="/product/list" className="hover:text-gray-300">상품 관리</Link>
             <Link href="/market" className="hover:text-gray-300">상품 검색</Link>
             <Link href="/product/register" className="hover:text-gray-300">상품 등록</Link>
           </>
-        )}
+
 
         {isLoggedIn ? (
           <div className="flex items-center space-x-3">
