@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { isBusy } from '../../../lib/status';
 import type { AnalysisResult, InsightResult, Product, Review } from '../../../lib/types';
-import { fetchProduct, fetchReviews, fetchLatestAnalysis, startCrawl, startAnalyze, deleteProduct } from '@/lib/api';
+import { fetchProduct, fetchReviews, fetchLatestAnalysis, startCrawl, startAnalyze, deleteProduct } from '../../../lib/api';
 
 import ProductHeader from '@/components/product/ProductHeader';
 import ProductStatusBanner from '@/components/product/ProductStatusBanner';
