@@ -5,7 +5,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { isBusy } from '../../../lib/status';
 import type { AnalysisResult, InsightResult, Product, Review } from '../../../lib/types';
-import { fetchProduct, fetchReviews, fetchLatestAnalysis, startCrawl, startAnalyze, deleteProduct, recollectReviews } from '../../../lib/api';
+import {
+  fetchProduct,
+  fetchReviews,
+  fetchLatestAnalysis,
+  startCrawl,
+  startAnalyze,
+  deleteProduct,
+  recollectReviews,
+} from '../../../lib/api';
 
 import ProductHeader from '@/components/product/ProductHeader';
 import ProductStatusBanner from '@/components/product/ProductStatusBanner';
@@ -66,7 +74,8 @@ export default function ProductDetailPage() {
   // 분석 결과
   const loadAnalysis = async () => {
     if (!product || product.analysis_status !== 'ANALYZED') {
-      setAnalysis(null); setInsight(null);
+      setAnalysis(null);
+      setInsight(null);
       return;
     }
     const res = await fetchLatestAnalysis(source, id);
@@ -115,57 +124,59 @@ export default function ProductDetailPage() {
     }
   };
 
-  // ✅ 재수집 핸들러 (폴링 추가)
+  // ? 재수집 핸들러 (폴링 포함)
   const onRecollect = async () => {
     if (!product) return;
-    
+
     if (!confirm('기존 리뷰와 분석 결과가 모두 삭제됩니다. 재수집하시겠습니까?')) {
       return;
     }
-    
+
     try {
       setPending((p) => ({ ...p, recollect: true }));
-      
+
       const res = await recollectReviews(product.source, product.source_product_id);
-      
+
       alert(res?.message || `재수집 시작${res?.task_id ? ` (Task: ${res.task_id})` : ''}`);
-      
+
       // 즉시 상품 정보 새로고침
       await loadProduct();
-      
+
       // 폴링 시작 (5초마다 상태 확인)
       const pollInterval = setInterval(async () => {
         const updatedProduct = await fetchProduct(product.source, product.source_product_id);
         setProduct(updatedProduct);
-        
+
         console.log(`[POLLING] 상태: ${updatedProduct.analysis_status}`);
-        
+
         // 완료되면 폴링 중단
-        if (updatedProduct.analysis_status === 'ANALYZED' || updatedProduct.analysis_status === 'FAILED') {
+        if (
+          updatedProduct.analysis_status === 'ANALYZED' ||
+          updatedProduct.analysis_status === 'FAILED'
+        ) {
           clearInterval(pollInterval);
           console.log('[POLLING] 완료 - 폴링 중단');
-          
+
           // 리뷰와 분석 결과 새로고침
           await loadReviews();
           await loadAnalysis();
-          
+
           setPending((p) => ({ ...p, recollect: false }));
-          
+
           if (updatedProduct.analysis_status === 'ANALYZED') {
-            alert('재수집 및 분석이 완료되었습니다! 🎉');
+            alert('재수집 및 분석이 완료되었습니다! ??');
           } else {
-            alert('재수집 중 오류가 발생했습니다. ❌');
+            alert('재수집 중 오류가 발생했습니다. ?');
           }
         }
       }, 5000);
-      
+
       // 5분 후 자동 중단
       setTimeout(() => {
         clearInterval(pollInterval);
         setPending((p) => ({ ...p, recollect: false }));
         console.log('[POLLING] 타임아웃 - 폴링 중단');
       }, 300000);
-      
     } catch (e: any) {
       alert(e?.message || '재수집 요청 실패');
       setPending((p) => ({ ...p, recollect: false }));
@@ -189,6 +200,10 @@ export default function ProductDetailPage() {
   // 바쁜 상태에서 버튼 비활성화
   const busy = useMemo(() => isBusy(product?.analysis_status), [product?.analysis_status]);
 
+  // ? PDF 가능 조건(부모에서 엄격 판단): 분석 완료 + 분석/인사이트 로드됨
+  const canDownloadPdf =
+    product?.analysis_status === 'ANALYZED' && !!analysis && !!insight;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -208,7 +223,10 @@ export default function ProductDetailPage() {
             <p className="font-semibold mb-2">오류가 발생했습니다</p>
             <p>{error || '상품을 찾을 수 없습니다.'}</p>
           </div>
-          <Link href="/product/list" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700">
+          <Link
+            href="/product/list"
+            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
@@ -223,7 +241,10 @@ export default function ProductDetailPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="mb-6">
-          <Link href="/product/list" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition">
+          <Link
+            href="/product/list"
+            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition"
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
@@ -234,6 +255,7 @@ export default function ProductDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <ProductHeader product={product} />
+
             <ProductStatusBanner
               status={product.analysis_status}
               onStartCrawl={onStartCrawl}
@@ -241,8 +263,12 @@ export default function ProductDetailPage() {
               busy={busy || pending.crawl || pending.analyze || pending.recollect}
             />
 
-            {analysis && product.analysis_status === 'ANALYZED' && <ProductAnalysis result={analysis} />}
-            {insight  && product.analysis_status === 'ANALYZED' && <ProductInsights result={insight} />}
+            {analysis && product.analysis_status === 'ANALYZED' && (
+              <ProductAnalysis result={analysis} />
+            )}
+            {insight && product.analysis_status === 'ANALYZED' && (
+              <ProductInsights result={insight} />
+            )}
 
             <ProductReviews
               reviews={reviews}
@@ -261,6 +287,7 @@ export default function ProductDetailPage() {
               onDelete={onDelete}
               onRecollect={onRecollect}
               pendingFlags={pending}
+              canDownloadPdf={canDownloadPdf}  // ? 여기서 제어
             />
           </div>
         </div>
